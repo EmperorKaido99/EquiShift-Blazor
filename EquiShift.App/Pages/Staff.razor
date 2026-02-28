@@ -1,0 +1,84 @@
+@page "/staff"
+@using EquiShift.App.Models
+@using EquiShift.App.Services
+@inject IShiftSchedulerService SchedulerService
+@rendermode InteractiveServer
+
+<PageTitle>EquiShift – Staff</PageTitle>
+
+<div class="page-header">
+    <h1>Staff Management</h1>
+    <button class="btn-generate" @onclick="AddStaff">+ Add Staff</button>
+</div>
+
+<table class="staff-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var member in staffList)
+        {
+            <tr>
+                <td>@member.Id</td>
+                <td>
+                    <input @bind="member.Name" class="inline-input" />
+                </td>
+                <td>
+                    <select @bind="member.Role" class="inline-select">
+                        @foreach (var role in Enum.GetValues<StaffRole>())
+                        {
+                            <option value="@role">@role</option>
+                        }
+                    </select>
+                </td>
+                <td>
+                    <button class="btn-danger" @onclick="() => RemoveStaff(member)">Remove</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="form-actions">
+    <button class="btn-generate" @onclick="SaveStaff">💾 Save Changes</button>
+    @if (saved)
+    {
+        <span class="saved-msg">✅ Saved!</span>
+    }
+</div>
+
+@code {
+    private List<StaffMember> staffList = new();
+    private bool saved = false;
+
+    protected override void OnInitialized()
+    {
+        staffList = SchedulerService.GetStaff()
+            .Select(s => new StaffMember { Id = s.Id, Name = s.Name, Role = s.Role })
+            .ToList();
+    }
+
+    private void AddStaff()
+    {
+        staffList.Add(new StaffMember
+        {
+            Id = staffList.Any() ? staffList.Max(s => s.Id) + 1 : 1,
+            Name = "New Staff",
+            Role = StaffRole.Regular
+        });
+    }
+
+    private void RemoveStaff(StaffMember member) => staffList.Remove(member);
+
+    private void SaveStaff()
+    {
+        SchedulerService.UpdateStaff(staffList);
+        saved = true;
+        Task.Delay(2000).ContinueWith(_ => { saved = false; InvokeAsync(StateHasChanged); });
+    }
+}
