@@ -1,0 +1,93 @@
+@page "/"
+@using EquiShift.App.Models
+@using EquiShift.App.Services
+@inject IShiftSchedulerService SchedulerService
+@rendermode InteractiveServer
+
+<PageTitle>EquiShift – Schedule</PageTitle>
+
+<div class="page-header">
+    <h1>Monthly Schedule</h1>
+    <div class="controls">
+        <select @bind="selectedYear">
+            @foreach (var y in Enumerable.Range(DateTime.Today.Year, 2))
+            {
+                <option value="@y">@y</option>
+            }
+        </select>
+        <select @bind="selectedMonth">
+            @for (int m = 1; m <= 12; m++)
+            {
+                var monthName = new DateTime(2000, m, 1).ToString("MMMM");
+                <option value="@m">@monthName</option>
+            }
+        </select>
+        <button class="btn-generate" @onclick="GenerateSchedule">⚡ Generate Schedule</button>
+    </div>
+</div>
+
+@if (schedule != null)
+{
+    <div class="summary-bar">
+        @foreach (var s in schedule.Staff)
+        {
+            <div class="staff-badge @(s.Role.ToString().ToLower())">
+                <strong>@s.Name</strong>
+                <span>@s.ShiftsThisMonth shifts (@s.DayShifts D / @s.NightShifts N)</span>
+            </div>
+        }
+    </div>
+
+    <div class="calendar">
+        @{
+            var grouped = schedule.Assignments
+                .GroupBy(a => a.Date)
+                .OrderBy(g => g.Key);
+        }
+        @foreach (var dayGroup in grouped)
+        {
+            var date = dayGroup.Key;
+            bool isWeekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+            <div class="day-card @(isWeekend ? "weekend" : "")">
+                <div class="day-header">
+                    <span class="day-name">@date.ToString("ddd")</span>
+                    <span class="day-num">@date.Day</span>
+                </div>
+                @foreach (var shift in dayGroup.OrderBy(s => s.ShiftType))
+                {
+                    <div class="shift @(shift.ShiftType == ShiftType.Day ? "day-shift" : "night-shift") @(shift.IsShortage ? "shortage" : "")">
+                        <span class="shift-icon">@(shift.ShiftType == ShiftType.Day ? "☀️" : "🌙")</span>
+                        <span class="shift-name">
+                            @(shift.IsShortage ? "⚠️ Shortage" : shift.AssignedStaff?.Name)
+                        </span>
+                        @if (shift.AssignedStaff?.Role == StaffRole.Supervisor)
+                        {
+                            <span class="role-tag sup">SUP</span>
+                        }
+                        else if (shift.AssignedStaff?.Role == StaffRole.Cleaner)
+                        {
+                            <span class="role-tag cln">CLN</span>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <p>Select a month and click <strong>Generate Schedule</strong> to get started.</p>
+    </div>
+}
+
+@code {
+    private int selectedYear = DateTime.Today.Year;
+    private int selectedMonth = DateTime.Today.Month;
+    private MonthlySchedule? schedule;
+
+    private void GenerateSchedule()
+    {
+        schedule = SchedulerService.GenerateSchedule(selectedYear, selectedMonth);
+    }
+}
